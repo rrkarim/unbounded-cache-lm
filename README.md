@@ -14,3 +14,7 @@ $ python model.py --batchsize=64 --gpu=0 --embed=128 --unit=256 --out=result -L=
 ## Reference
 Edouard Grave, Moustapha Cisse, Armand Joulin
 (https://arxiv.org/abs/1711.02604)
+
+## TODO
+
+- [ ] IVFPQ (https://arxiv.org/abs/1702.08734)
