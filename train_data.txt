@@ -1,0 +1,2 @@
+{"input": ["I", "have", "a", "pen", ".", "I", "have", "an", "apple", "."], "output": ["apple", "pen"]}
+{"input": ["I", "have", "a", "pen", ".", "I", "have", "a", "pineapple", "."], "output": ["pineapple", "pen"]}
