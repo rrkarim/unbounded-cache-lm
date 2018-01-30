@@ -4,7 +4,7 @@
 ## Requirement
 Chainer v1.15.0.1
 
-### Traing
+### Training
 `model.py` contains code for building model.  
 You can start training like following command:
 ```shell
