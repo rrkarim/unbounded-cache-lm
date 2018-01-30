@@ -19,9 +19,9 @@ import BeamSearch
 logging.basicConfig(filename="train.log", level=logging.DEBUG)
 
 
-class PointerSentinelMixtureModels(Chain):
+class PSMMCache(Chain):
     def __init__(self, input_size, output_size, feature_size, hidden_size, L, vocab):
-        super(PointerSentinelMixtureModels, self).__init__(
+        super(PSMMCache, self).__init__(
             embed=Links.EmbedID(input_size, feature_size),
             H=Links.LSTM(feature_size, hidden_size),
             U=Links.Linear(hidden_size, output_size),
@@ -166,7 +166,7 @@ def main():
             with open("data/id2wd", "w", encoding="utf-8") as wf:
                 wf.write(json.dumps(id2wd, ensure_ascii=False))
 
-            model = PointerSentinelMixtureModels(vsize, vsize, embed_dim, hidden_size, window_size, vocab)
+            model = PSMMCache(vsize, vsize, embed_dim, hidden_size, window_size, vocab)
 
         if args.mode == "restart":
             with open(vocab_path, "r", encoding="utf-8") as rf:
@@ -176,7 +176,7 @@ def main():
                 id2wd = json.loads(rf.read())
             vsize = len(vocab)
 
-            model = PointerSentinelMixtureModels(vsize, vsize, embed_dim, hidden_size, window_size, vocab)
+            model = PSMMCache(vsize, vsize, embed_dim, hidden_size, window_size, vocab)
             serializers.load_npz(args.model, model)
 
 
@@ -216,7 +216,7 @@ def main():
                 logging.info("epoch {}'s calc time {}".format(str(epoch), str(e-s)))
                 # save model every 500 epoch
                 if epoch % 500 == 0:
-                    outfile = "PointerSentinelMixtureModels-{}.model".format(str(epoch))
+                    outfile = "PSMMCache-{}.model".format(str(epoch))
                     serializers.save_npz(args.out + "/" + outfile, model)
                     logging.info("Saved Models as {}".format(outfile))
 
@@ -228,7 +228,7 @@ def main():
             if early_stopping:
                 break
 
-        outfile = "PointerSentinelMixtureModels-Final.model"
+        outfile = "PSMMCache-Final.model"
         serializers.save_npz(outfile, model)
         logging.info("Saved Models as {}".format(outfile))
 
@@ -248,7 +248,7 @@ def main():
             encode_data = [json.loads(line)["input"] for line in rf]
         vsize = len(vocab)
 
-        model = PointerSentinelMixtureModels(vsize, vsize, embed_dim, hidden_size, window_size, vocab)
+        model = PSMMCache(vsize, vsize, embed_dim, hidden_size, window_size, vocab)
         serializers.load_npz(args.model, model)
         model.to_cpu()
 
