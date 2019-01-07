@@ -66,7 +66,7 @@ class SupervisedTrainer(object):
             loss.eval_batch(
                 step_output.contiguous().view(batch_size, -1),
                 target_variable[:, step + 1],
-            )
+            )  # do we really need to call contiguous() or there is more efficient wayt of doing reshape
 
         model.zero_grad()
         loss.backward()
@@ -109,3 +109,115 @@ class SupervisedTrainer(object):
             log.debug("Epoch: %d, Step: %d" % (epoch, step))
 
             batch_generator = batch_iterator.__iter__()
+
+            for _ in range((epoch - 1) * steps_per_epoch, step):
+                next(
+                    batch_iterator
+                )  # Not efficient wayt of jumping to the batch that we need to execute after step
+
+            model.train(True)
+            for batch in batch_generator:
+                step += 1
+                step_elapsed += 1
+
+                input_variables, input_lengths = getattr(
+                    batch, cachemodel.src_field_name
+                )
+                target_variables = getattr(batch, cachemodel.tgt_field_name)
+
+                loss = self._train_batch(
+                    input_variables,
+                    input_lengths.tolist(),
+                    target_variables,
+                    model,
+                    teacher_forcing_ratio,
+                )
+
+                print_loss_total += loss
+                epoch_loss_total += loss
+
+                if step % self.print_every == 0 and step_elapsed > self.print_every:
+                    print_loss_avg = print_loss_total / self.print_every
+                    print_loss_total = 0
+                    los_msg = "Progress: %d%%, Train %s: %.4f" % (
+                        step / total_steps * 100,
+                        self.loss.name,
+                        print_loss_avg,
+                    )
+                    log.info(log_msg)
+
+                if step % self.checkpoint_every == 0 or step == total_steps:
+                    Checkpoint(
+                        model=model,
+                        optimizer=self.optimizer,
+                        epoch=epoch,
+                        step=step,
+                        input_vocab=data.fields[cachemodel.src_field_name].vocab,
+                        output_vocab=data.fields[cachemodel.tgt_field_name].vocab,
+                    ).save(self.expt_dir)
+            if step_elapsed == 0:
+                continue
+            epoch_loss_avg = epoch_loss_total / min(steps_per_epoch, step - start_step)
+            epoch_loss_total = 0
+            if dev_data is not None:
+                dev_loss, accuracy = self.evaluator.evaluate(model, dev_data)
+                self.optimizer.update(dev_loss, epoch)
+                log_msg += ", Dev %s: %.4f, Accuracy: %.4f" % (
+                    self.loss.name,
+                    dev_loss,
+                    accuracy,
+                )
+                model.train(mode=True)
+            else:
+                self.optimizer.update(epcoch_loss_avg, epoch)
+            log.info(log_msg)
+
+    def train(
+        self,
+        model,
+        data,
+        num_epochs=5,
+        resume=False,
+        dev_data=None,
+        optimizer=None,
+        teacher_forcing_ratop=0,
+    ):
+        if resume:
+            latest_checkpoint_path = Checkpoint.get_latest_checkpoint(self.expt_dir)
+            resume_checkpoint = Checkpoint.load(latest_checkpoint_path)
+            model = resume_checkpoint.model
+            self.optimizer = resume_checkpoint.optimizer
+
+            resume_optim = self.optimizer.optimizer
+            defaults = resume_optim.param_groups[0]
+            defaults.pop("params", None)
+            defaults.pop("initial_lr", None)
+            self.optimizer.optimizer = resume_optim.__class__(
+                model.parameters(), **defaults
+            )  # is there a need to remove default parameters?
+
+            start_epoch = resume_checkpoint.epoch
+            step = resume_checkpoint.step
+        else:
+            start_epoch = 1
+            step = 0
+            if optimizer is None:
+                optimizer = Optimizer(optim.Adam(model.parameters()), max_grad_norm=5)
+            self.optimizer = optimizer
+
+        self.logger.info(
+            "Optimizer: %s, Scheduler: %s"
+            % (self.optimizer.optimizer, self.optimizer.scheduler)
+        )
+
+        self._train_epoches(
+            data,
+            model,
+            num_epochs,
+            start_epoch,
+            step,
+            dev_data=dev_data,
+            teacher_forcing_ratio=teacher_forcing_ratio,
+        )
+
+        return model
