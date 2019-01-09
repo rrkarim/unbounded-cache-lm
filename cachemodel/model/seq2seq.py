@@ -6,7 +6,7 @@ class Seq2seq(nn.Module):
     def __init__(self, encoder, decoder, decode_function=F.log_softmax):
         super(Seq2seq, self).__init__()
         self.encoder = encoder
-        self.deocder = decoder
+        self.decoder = decoder
         self.decode_function = decode_function
 
     def flatten_parameters(self):

@@ -1,6 +1,8 @@
 from __future__ import print_function, division
 import cachemodel
 from cachemodel.loss import NLLLoss
+import torch
+import torchtext
 
 
 class Evaluator(object):
@@ -56,12 +58,12 @@ class Evaluator(object):
                         .sum()
                         .item()
                     )
-                    mathc += correct
+                    match += correct
                     total += non_padding.sum().item()
 
             if total == 0:
                 accuracy = float("nan")
             else:
-                accuracy = math / total
+                accuracy = match / total
 
             return loss.get_loss(), accuracy

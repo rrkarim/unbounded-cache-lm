@@ -41,10 +41,10 @@ class EncoderRNN(BaseRNN):
             dropout=dropout_p,
         )
 
-    def forward(self, input_var, input_lenghts=None):
+    def forward(self, input_var, input_lengths=None):
         embedded = self.embedding(input_var)
         embedded = self.input_dropout(embedded)
-        if sef.variable_lenghts:
+        if self.variable_lengths:
             embedded = nn.utils.rnn.pack_padded_sequence(
                 embedded, input_lengths, batch_first=True
             )

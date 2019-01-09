@@ -16,7 +16,7 @@ class Optimizer(object):
     def step(self):
         if self.max_grad_norm > 0:
             params = itertools.chain.from_iterable(
-                [group["params"] for group in self.optimizer.param_group]
+                [group["params"] for group in self.optimizer.param_groups]
             )
             torch.nn.utils.clip_grad_norm_(params, self.max_grad_norm)
         self.optimizer.step()

@@ -119,9 +119,6 @@ class SupervisedTrainer(object):
             for batch in batch_generator:
                 step += 1
                 step_elapsed += 1
-                import pdb
-                pdb.set_trace()
-
 
                 input_variables, input_lengths = getattr(
                     batch, cachemodel.src_field_name
@@ -142,7 +139,7 @@ class SupervisedTrainer(object):
                 if step % self.print_every == 0 and step_elapsed > self.print_every:
                     print_loss_avg = print_loss_total / self.print_every
                     print_loss_total = 0
-                    los_msg = "Progress: %d%%, Train %s: %.4f" % (
+                    log_msg = "Progress: %d%%, Train %s: %.4f" % (
                         step / total_steps * 100,
                         self.loss.name,
                         print_loss_avg,

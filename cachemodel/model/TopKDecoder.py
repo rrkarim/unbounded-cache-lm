@@ -2,8 +2,9 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+
 def _inflate(tensor, times, dim):
-        """
+    """
         Given a tensor, 'inflates' it along the given dimension by replicating each slice specified number of times (in-place)
 
         Args:
@@ -34,9 +35,10 @@ def _inflate(tensor, times, dim):
             [torch.LongTensor of size 4x2]
 
         """
-        repeat_dims = [1] * tensor.dim()
-        repeat_dims[dim] = times
-        return tensor.repeat(*repeat_dims)
+    repeat_dims = [1] * tensor.dim()
+    repeat_dims[dim] = times
+    return tensor.repeat(*repeat_dims)
+
 
 class TopKDecoder(torch.nn.Module):
     r"""
@@ -80,16 +82,26 @@ class TopKDecoder(torch.nn.Module):
         self.SOS = self.rnn.sos_id
         self.EOS = self.rnn.eos_id
 
-    def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, function=F.log_softmax,
-                    teacher_forcing_ratio=0, retain_output_probs=True):
+    def forward(
+        self,
+        inputs=None,
+        encoder_hidden=None,
+        encoder_outputs=None,
+        function=F.log_softmax,
+        teacher_forcing_ratio=0,
+        retain_output_probs=True,
+    ):
         """
         Forward rnn for MAX_LENGTH steps.  Look at :func:`seq2seq.models.DecoderRNN.DecoderRNN.forward_rnn` for details.
         """
 
-        inputs, batch_size, max_length = self.rnn._validate_args(inputs, encoder_hidden, encoder_outputs,
-                                                                 function, teacher_forcing_ratio)
+        inputs, batch_size, max_length = self.rnn._validate_args(
+            inputs, encoder_hidden, encoder_outputs, function, teacher_forcing_ratio
+        )
 
-        self.pos_index = Variable(torch.LongTensor(range(batch_size)) * self.k).view(-1, 1)
+        self.pos_index = Variable(torch.LongTensor(range(batch_size)) * self.k).view(
+            -1, 1
+        )
 
         # Inflate the initial hidden states to be of size: b*k x h
         encoder_hidden = self.rnn._init_state(encoder_hidden)
@@ -110,12 +122,16 @@ class TopKDecoder(torch.nn.Module):
         # Initialize the scores; for the first step,
         # ignore the inflated copies to avoid duplicate entries in the top k
         sequence_scores = torch.Tensor(batch_size * self.k, 1)
-        sequence_scores.fill_(-float('Inf'))
-        sequence_scores.index_fill_(0, torch.LongTensor([i * self.k for i in range(0, batch_size)]), 0.0)
+        sequence_scores.fill_(-float("Inf"))
+        sequence_scores.index_fill_(
+            0, torch.LongTensor([i * self.k for i in range(0, batch_size)]), 0.0
+        )
         sequence_scores = Variable(sequence_scores)
 
         # Initialize the input vector
-        input_var = Variable(torch.transpose(torch.LongTensor([[self.SOS] * batch_size * self.k]), 0, 1))
+        input_var = Variable(
+            torch.transpose(torch.LongTensor([[self.SOS] * batch_size * self.k]), 0, 1)
+        )
 
         # Store decisions for backtracking
         stored_outputs = list()
@@ -127,8 +143,9 @@ class TopKDecoder(torch.nn.Module):
         for _ in range(0, max_length):
 
             # Run the RNN one step forward
-            log_softmax_output, hidden, _ = self.rnn.forward_step(input_var, hidden,
-                                                                  inflated_encoder_outputs, function=function)
+            log_softmax_output, hidden, _ = self.rnn.forward_step(
+                input_var, hidden, inflated_encoder_outputs, function=function
+            )
 
             # If doing local backprop (e.g. supervised training), retain the output layer
             if retain_output_probs:
@@ -137,16 +154,22 @@ class TopKDecoder(torch.nn.Module):
             # To get the full sequence scores for the new candidates, add the local scores for t_i to the predecessor scores for t_(i-1)
             sequence_scores = _inflate(sequence_scores, self.V, 1)
             sequence_scores += log_softmax_output.squeeze(1)
-            scores, candidates = sequence_scores.view(batch_size, -1).topk(self.k, dim=1)
+            scores, candidates = sequence_scores.view(batch_size, -1).topk(
+                self.k, dim=1
+            )
 
             # Reshape input = (bk, 1) and sequence_scores = (bk, 1)
             input_var = (candidates % self.V).view(batch_size * self.k, 1)
             sequence_scores = scores.view(batch_size * self.k, 1)
 
             # Update fields for next timestep
-            predecessors = (candidates / self.V + self.pos_index.expand_as(candidates)).view(batch_size * self.k, 1)
+            predecessors = (
+                candidates / self.V + self.pos_index.expand_as(candidates)
+            ).view(batch_size * self.k, 1)
             if isinstance(hidden, tuple):
-                hidden = tuple([h.index_select(1, predecessors.squeeze()) for h in hidden])
+                hidden = tuple(
+                    [h.index_select(1, predecessors.squeeze()) for h in hidden]
+                )
             else:
                 hidden = hidden.index_select(1, predecessors.squeeze())
 
@@ -154,7 +177,7 @@ class TopKDecoder(torch.nn.Module):
             stored_scores.append(sequence_scores.clone())
             eos_indices = input_var.data.eq(self.EOS)
             if eos_indices.nonzero().dim() > 0:
-                sequence_scores.data.masked_fill_(eos_indices, -float('inf'))
+                sequence_scores.data.masked_fill_(eos_indices, -float("inf"))
 
             # Cache results for backtracking
             stored_predecessors.append(predecessors)
@@ -162,9 +185,15 @@ class TopKDecoder(torch.nn.Module):
             stored_hidden.append(hidden)
 
         # Do backtracking to return the optimal values
-        output, h_t, h_n, s, l, p = self._backtrack(stored_outputs, stored_hidden,
-                                                    stored_predecessors, stored_emitted_symbols,
-                                                    stored_scores, batch_size, self.hidden_size)
+        output, h_t, h_n, s, l, p = self._backtrack(
+            stored_outputs,
+            stored_hidden,
+            stored_predecessors,
+            stored_emitted_symbols,
+            stored_scores,
+            batch_size,
+            self.hidden_size,
+        )
 
         # Build return objects
         decoder_outputs = [step[:, 0, :] for step in output]
@@ -173,17 +202,19 @@ class TopKDecoder(torch.nn.Module):
         else:
             decoder_hidden = h_n[:, :, 0, :]
         metadata = {}
-        metadata['inputs'] = inputs
-        metadata['output'] = output
-        metadata['h_t'] = h_t
-        metadata['score'] = s
-        metadata['topk_length'] = l
-        metadata['topk_sequence'] = p
-        metadata['length'] = [seq_len[0] for seq_len in l]
-        metadata['sequence'] = [seq[0] for seq in p]
+        metadata["inputs"] = inputs
+        metadata["output"] = output
+        metadata["h_t"] = h_t
+        metadata["score"] = s
+        metadata["topk_length"] = l
+        metadata["topk_sequence"] = p
+        metadata["length"] = [seq_len[0] for seq_len in l]
+        metadata["sequence"] = [seq[0] for seq in p]
         return decoder_outputs, decoder_hidden, metadata
 
-    def _backtrack(self, nw_output, nw_hidden, predecessors, symbols, scores, b, hidden_size):
+    def _backtrack(
+        self, nw_output, nw_hidden, predecessors, symbols, scores, b, hidden_size
+    ):
         """Backtracks over batch to generate optimal k-sequences.
 
         Args:
@@ -226,8 +257,10 @@ class TopKDecoder(torch.nn.Module):
             h_n = tuple([torch.zeros(state_size), torch.zeros(state_size)])
         else:
             h_n = torch.zeros(nw_hidden[0].size())
-        l = [[self.rnn.max_length] * self.k for _ in range(b)]  # Placeholder for lengths of top-k sequences
-                                                                # Similar to `h_n`
+        l = [
+            [self.rnn.max_length] * self.k for _ in range(b)
+        ]  # Placeholder for lengths of top-k sequences
+        # Similar to `h_n`
 
         # the last step output of the beams are not sorted
         # thus they are sorted here
@@ -235,18 +268,22 @@ class TopKDecoder(torch.nn.Module):
         # initialize the sequence scores with the sorted last step beam scores
         s = sorted_score.clone()
 
-        batch_eos_found = [0] * b   # the number of EOS found
-                                    # in the backward loop below for each batch
+        batch_eos_found = [0] * b  # the number of EOS found
+        # in the backward loop below for each batch
 
         t = self.rnn.max_length - 1
         # initialize the back pointer with the sorted order of the last step beams.
         # add self.pos_index for indexing variable with b*k as the first dimension.
-        t_predecessors = (sorted_idx + self.pos_index.expand_as(sorted_idx)).view(b * self.k)
+        t_predecessors = (sorted_idx + self.pos_index.expand_as(sorted_idx)).view(
+            b * self.k
+        )
         while t >= 0:
             # Re-order the variables with the back pointer
             current_output = nw_output[t].index_select(0, t_predecessors)
             if lstm:
-                current_hidden = tuple([h.index_select(1, t_predecessors) for h in nw_hidden[t]])
+                current_hidden = tuple(
+                    [h.index_select(1, t_predecessors) for h in nw_hidden[t]]
+                )
             else:
                 current_hidden = nw_hidden[t].index_select(1, t_predecessors)
             current_symbol = symbols[t].index_select(0, t_predecessors)
@@ -273,7 +310,7 @@ class TopKDecoder(torch.nn.Module):
             #
             eos_indices = symbols[t].data.squeeze(1).eq(self.EOS).nonzero()
             if eos_indices.dim() > 0:
-                for i in range(eos_indices.size(0)-1, -1, -1):
+                for i in range(eos_indices.size(0) - 1, -1, -1):
                     # Indices of the EOS symbol for both variables
                     # with b*k as the first dimension, and b, k for
                     # the first two dimensions
@@ -312,30 +349,58 @@ class TopKDecoder(torch.nn.Module):
         # the order (very unlikely)
         s, re_sorted_idx = s.topk(self.k)
         for b_idx in range(b):
-            l[b_idx] = [l[b_idx][k_idx.item()] for k_idx in re_sorted_idx[b_idx,:]]
+            l[b_idx] = [l[b_idx][k_idx.item()] for k_idx in re_sorted_idx[b_idx, :]]
 
-        re_sorted_idx = (re_sorted_idx + self.pos_index.expand_as(re_sorted_idx)).view(b * self.k)
+        re_sorted_idx = (re_sorted_idx + self.pos_index.expand_as(re_sorted_idx)).view(
+            b * self.k
+        )
 
         # Reverse the sequences and re-order at the same time
         # It is reversed because the backtracking happens in reverse time order
-        output = [step.index_select(0, re_sorted_idx).view(b, self.k, -1) for step in reversed(output)]
-        p = [step.index_select(0, re_sorted_idx).view(b, self.k, -1) for step in reversed(p)]
+        output = [
+            step.index_select(0, re_sorted_idx).view(b, self.k, -1)
+            for step in reversed(output)
+        ]
+        p = [
+            step.index_select(0, re_sorted_idx).view(b, self.k, -1)
+            for step in reversed(p)
+        ]
         if lstm:
-            h_t = [tuple([h.index_select(1, re_sorted_idx).view(-1, b, self.k, hidden_size) for h in step]) for step in reversed(h_t)]
-            h_n = tuple([h.index_select(1, re_sorted_idx.data).view(-1, b, self.k, hidden_size) for h in h_n])
+            h_t = [
+                tuple(
+                    [
+                        h.index_select(1, re_sorted_idx).view(
+                            -1, b, self.k, hidden_size
+                        )
+                        for h in step
+                    ]
+                )
+                for step in reversed(h_t)
+            ]
+            h_n = tuple(
+                [
+                    h.index_select(1, re_sorted_idx.data).view(
+                        -1, b, self.k, hidden_size
+                    )
+                    for h in h_n
+                ]
+            )
         else:
-            h_t = [step.index_select(1, re_sorted_idx).view(-1, b, self.k, hidden_size) for step in reversed(h_t)]
-            h_n = h_n.index_select(1, re_sorted_idx.data).view(-1, b, self.k, hidden_size)
+            h_t = [
+                step.index_select(1, re_sorted_idx).view(-1, b, self.k, hidden_size)
+                for step in reversed(h_t)
+            ]
+            h_n = h_n.index_select(1, re_sorted_idx.data).view(
+                -1, b, self.k, hidden_size
+            )
         s = s.data
 
         return output, h_t, h_n, s, l, p
 
-    def _mask_symbol_scores(self, score, idx, masking_score=-float('inf')):
-            score[idx] = masking_score
+    def _mask_symbol_scores(self, score, idx, masking_score=-float("inf")):
+        score[idx] = masking_score
 
-    def _mask(self, tensor, idx, dim=0, masking_score=-float('inf')):
+    def _mask(self, tensor, idx, dim=0, masking_score=-float("inf")):
         if len(idx.size()) > 0:
             indices = idx[:, 0]
             tensor.index_fill_(dim, indices, masking_score)
-
-
