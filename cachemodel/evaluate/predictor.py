@@ -4,7 +4,6 @@ from cachemodel.model import Cache
 
 
 class Predictor(object):
-
     def __init__(self, model, src_vocab, tgt_vocab, cache=False, alpha=0):
         if torch.cuda.is_available():
             self.model = model.cuda()
@@ -26,18 +25,18 @@ class Predictor(object):
             src_id_seq = src_id_seq.cuda()
 
         with torch.no_grad():
-            softmax_list, hidden, other = self.model(src_id_seq, [len(src_seq)], cache=cache)
+            softmax_list, hidden, other = self.model(
+                src_id_seq, [len(src_seq)], cache=cache
+            )
 
         return other, hidden
 
-
     def predict_with_cache(self, other, hidden):
         alpha = self.cache.smooth
-        cache_p = self.cache.calculate_sum(other['hidden'])
-        p = alpha * other['sequence_sm'] + (1. - alpha) * cache_p
+        cache_p = self.cache.calculate_sum(other["hidden"])
+        p = alpha * other["sequence_sm"] + (1.0 - alpha) * cache_p
         p = F.log_softmax(p)
         symbols = p.topk(1)[1]
-
 
     def predict(self, src_seq, cache):
         other, hidden = self.get_decoder_features(src_seq, cache)
@@ -47,7 +46,6 @@ class Predictor(object):
         tgt_id_seq = [other["sequence"][di][0].data[0] for di in range(length)]
         tgt_seq = [self.tgt_vocab.itos[tok] for tok in tgt_id_seq]
         return tgt_seq
-
 
     def predict_n(self, src_seq, n=1):
         other, hidden = self.get_decoder_features(src_seq)

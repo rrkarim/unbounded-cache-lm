@@ -6,7 +6,7 @@ import torch.nn.functional as F
 class Attention(nn.Module):
     def __init__(self, dim):
         super(Attention, self).__init__()
-        self.linear_out = nn.Linear(dim*2, dim)
+        self.linear_out = nn.Linear(dim * 2, dim)
         self.mask = None
 
     def set_mask(self, mask):
@@ -19,8 +19,10 @@ class Attention(nn.Module):
         # (batch, out_len, dim) * (batch, in_len, dim) -> (batch, out_len, in_len)
         attn = torch.bmm(output, context.transpose(1, 2))
         if self.mask is not None:
-            attn.data.masked_fill_(self.mask, -float('inf'))
-        attn = F.softmax(attn.view(-1, input_size), dim=1).view(batch_size, -1, input_size)
+            attn.data.masked_fill_(self.mask, -float("inf"))
+        attn = F.softmax(attn.view(-1, input_size), dim=1).view(
+            batch_size, -1, input_size
+        )
 
         # (batch, out_len, in_len) * (batch, in_len, dim) -> (batch, out_len, dim)
         mix = torch.bmm(attn, context)
@@ -28,6 +30,8 @@ class Attention(nn.Module):
         # concat -> (batch, out_len, 2*dim)
         combined = torch.cat((mix, output), dim=2)
         # output -> (batch, out_len, dim)
-        output = F.tanh(self.linear_out(combined.view(-1, 2 * hidden_size))).view(batch_size, -1, hidden_size)
+        output = F.tanh(self.linear_out(combined.view(-1, 2 * hidden_size))).view(
+            batch_size, -1, hidden_size
+        )
 
         return output, attn

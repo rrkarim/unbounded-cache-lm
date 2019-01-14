@@ -21,7 +21,7 @@ class DecoderRNN(BaseRNN):
     KEY_LENGTH = "length"
     KEY_SEQUENCE = "sequence"
     KEY_SEQUENCE_SM = "sequence_sm"
-    KEY_HIDDEN = 'hidden'
+    KEY_HIDDEN = "hidden"
 
     def __init__(
         self,
@@ -113,13 +113,15 @@ class DecoderRNN(BaseRNN):
                 ret_dict[DecoderRNN.KEY_ATTN_SCORE].append(step_attn)
             if cache is not None:
                 df = cache.calculate_sum(torch.squeeze(decoder_hidden))
-                average_p = cache.alpha * step_output + (1.-cache.alpha) * cache.calculate_sum(torch.squeeze(decoder_hidden))
+                average_p = cache.alpha * step_output + (
+                    1.0 - cache.alpha
+                ) * cache.calculate_sum(torch.squeeze(decoder_hidden))
                 average_p = F.log_softmax(average_p)
                 decoder_outputs.append(average_p)
             else:
                 decoder_outputs.append(step_output)
 
-            symbols = decoder_outputs[-1].topk(1)[1] # TODO: hardcode
+            symbols = decoder_outputs[-1].topk(1)[1]  # TODO: hardcode
             if cache is not None:
                 cache._add_element(symbols.numpy()[0][0], decoder_hidden)
 
@@ -133,7 +135,7 @@ class DecoderRNN(BaseRNN):
                 lengths[update_idx] = len(sequence_symbols)
             return symbols
 
-        if use_teacher_forcing: #
+        if use_teacher_forcing:  #
             decoder_input = inputs[:, :-1]
             decoder_output, decoder_hidden, attn = self.forward_step(
                 decoder_input, decoder_hidden, encoder_outputs, function=function

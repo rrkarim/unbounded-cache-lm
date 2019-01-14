@@ -106,7 +106,6 @@ class TopKDecoder(torch.nn.Module):
             else:
                 hidden = hidden.index_select(1, predecessors.squeeze())
 
-            # Update sequence scores and erase scores for end-of-sentence symbol so that they aren't expanded
             stored_scores.append(sequence_scores.clone())
             eos_indices = input_var.data.eq(self.EOS)
             if eos_indices.nonzero().dim() > 0:
