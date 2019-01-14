@@ -20,6 +20,8 @@ class DecoderRNN(BaseRNN):
     KEY_ATTN_SCORE = "attention_score"
     KEY_LENGTH = "length"
     KEY_SEQUENCE = "sequence"
+    KEY_SEQUENCE_SM = "sequence_sm"
+    KEY_HIDDEN = 'hidden'
 
     def __init__(
         self,
@@ -88,6 +90,7 @@ class DecoderRNN(BaseRNN):
         encoder_outputs=None,
         function=F.log_softmax,
         teacher_forcing_ratio=0,
+        cache=False,
     ):
         ret_dict = dict()
         if self.use_attention:
@@ -102,14 +105,26 @@ class DecoderRNN(BaseRNN):
 
         decoder_outputs = []
         sequence_symbols = []
+        sequence_softmax = []
         lengths = np.array([max_length] * batch_size)
 
-        def decode(step, step_output, step_attn):
-            decoder_outputs.append(step_output)
+        def decode(step, step_output, step_attn, decoder_hidden):
             if self.use_attention:
                 ret_dict[DecoderRNN.KEY_ATTN_SCORE].append(step_attn)
-            symbols = decoder_outputs[-1].topk(1)[1]
+            if cache is not None:
+                df = cache.calculate_sum(torch.squeeze(decoder_hidden))
+                average_p = cache.alpha * step_output + (1.-cache.alpha) * cache.calculate_sum(torch.squeeze(decoder_hidden))
+                average_p = F.log_softmax(average_p)
+                decoder_outputs.append(average_p)
+            else:
+                decoder_outputs.append(step_output)
+
+            symbols = decoder_outputs[-1].topk(1)[1] # TODO: hardcode
+            if cache is not None:
+                cache._add_element(symbols.numpy()[0][0], decoder_hidden)
+
             sequence_symbols.append(symbols)
+            sequence_softmax.append(step_output)
 
             eos_batches = symbols.data.eq(self.eos_id)
             if eos_batches.dim() > 0:
@@ -118,7 +133,7 @@ class DecoderRNN(BaseRNN):
                 lengths[update_idx] = len(sequence_symbols)
             return symbols
 
-        if use_teacher_forcing:
+        if use_teacher_forcing: #
             decoder_input = inputs[:, :-1]
             decoder_output, decoder_hidden, attn = self.forward_step(
                 decoder_input, decoder_hidden, encoder_outputs, function=function
@@ -130,7 +145,7 @@ class DecoderRNN(BaseRNN):
                     step_attn = attn[:, di, :]
                 else:
                     step_attn = None
-                decode(di, step_output, step_attn)
+                decode(di, step_output, step_attn, decoder_hidden)
         else:
             decoder_input = inputs[:, 0].unsqueeze(1)
             for di in range(max_length):
@@ -138,10 +153,12 @@ class DecoderRNN(BaseRNN):
                     decoder_input, decoder_hidden, encoder_outputs, function=function
                 )
                 step_output = decoder_output.squeeze(1)
-                symbols = decode(di, step_output, step_attn)
+                symbols = decode(di, step_output, step_attn, decoder_hidden)
                 decoder_input = symbols
 
         ret_dict[DecoderRNN.KEY_SEQUENCE] = sequence_symbols
+        ret_dict[DecoderRNN.KEY_SEQUENCE_SM] = sequence_softmax
+        ret_dict[DecoderRNN.KEY_HIDDEN] = decoder_hidden
         ret_dict[DecoderRNN.KEY_LENGTH] = lengths.tolist()
 
         return decoder_outputs, decoder_hidden, ret_dict

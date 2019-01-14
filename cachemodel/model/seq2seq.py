@@ -19,6 +19,7 @@ class Seq2seq(nn.Module):
         input_lengths=None,
         target_variable=None,
         teacher_forcing_ratio=0,
+        cache=False,
     ):
         encoder_outputs, encoder_hidden = self.encoder(input_variable, input_lengths)
         result = self.decoder(
@@ -27,6 +28,7 @@ class Seq2seq(nn.Module):
             encoder_outputs=encoder_outputs,
             function=self.decode_function,
             teacher_forcing_ratio=teacher_forcing_ratio,
+            cache=cache,
         )
 
         return result

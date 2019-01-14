@@ -1,17 +1,11 @@
 import torch
 from torch.autograd import Variable
+from cachemodel.model import Cache
 
 
 class Predictor(object):
-    def __init__(self, model, src_vocab, tgt_vocab):
-        """
-        Predictor class to evaluate for a given model.
-        Args:
-            model (seq2seq.models): trained model. This can be loaded from a checkpoint
-                using `seq2seq.util.checkpoint.load`
-            src_vocab (seq2seq.dataset.vocabulary.Vocabulary): source sequence vocabulary
-            tgt_vocab (seq2seq.dataset.vocabulary.Vocabulary): target sequence vocabulary
-        """
+
+    def __init__(self, model, src_vocab, tgt_vocab, cache=False, alpha=0):
         if torch.cuda.is_available():
             self.model = model.cuda()
         else:
@@ -19,8 +13,12 @@ class Predictor(object):
         self.model.eval()
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
+        if cache == True:
+            self.cache = Cache(self.src_vocab, alpha)
+        else:
+            self.cache = None
 
-    def get_decoder_features(self, src_seq):
+    def get_decoder_features(self, src_seq, cache=None):
         src_id_seq = torch.LongTensor(
             [self.src_vocab.stoi[tok] for tok in src_seq]
         ).view(1, -1)
@@ -28,21 +26,21 @@ class Predictor(object):
             src_id_seq = src_id_seq.cuda()
 
         with torch.no_grad():
-            softmax_list, _, other = self.model(src_id_seq, [len(src_seq)])
+            softmax_list, hidden, other = self.model(src_id_seq, [len(src_seq)], cache=cache)
 
-        return other
+        return other, hidden
 
-    def predict(self, src_seq):
-        """ Make prediction given `src_seq` as input.
 
-        Args:
-            src_seq (list): list of tokens in source language
+    def predict_with_cache(self, other, hidden):
+        alpha = self.cache.smooth
+        cache_p = self.cache.calculate_sum(other['hidden'])
+        p = alpha * other['sequence_sm'] + (1. - alpha) * cache_p
+        p = F.log_softmax(p)
+        symbols = p.topk(1)[1]
 
-        Returns:
-            tgt_seq (list): list of tokens in target language as predicted
-            by the pre-trained model
-        """
-        other = self.get_decoder_features(src_seq)
+
+    def predict(self, src_seq, cache):
+        other, hidden = self.get_decoder_features(src_seq, cache)
 
         length = other["length"][0]
 
@@ -50,19 +48,9 @@ class Predictor(object):
         tgt_seq = [self.tgt_vocab.itos[tok] for tok in tgt_id_seq]
         return tgt_seq
 
+
     def predict_n(self, src_seq, n=1):
-        """ Make 'n' predictions given `src_seq` as input.
-
-        Args:
-            src_seq (list): list of tokens in source language
-            n (int): number of predicted seqs to return. If None,
-                     it will return just one seq.
-
-        Returns:
-            tgt_seq (list): list of tokens in target language as predicted
-                            by the pre-trained model
-        """
-        other = self.get_decoder_features(src_seq)
+        other, hidden = self.get_decoder_features(src_seq)
 
         result = []
         for x in range(0, int(n)):

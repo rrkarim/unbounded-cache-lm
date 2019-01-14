@@ -8,7 +8,7 @@ import torchtext
 
 import cachemodel  # TODO
 from cachemodel.train import SupervisedTrainer
-from cachemodel.model import EncoderRNN, DecoderRNN, Seq2seq
+from cachemodel.model import EncoderRNN, DecoderRNN, Seq2seq, Cache
 from cachemodel.loss import Perplexity
 from cachemodel.optim import Optimizer
 from cachemodel.dataset import SourceField, TargetField
@@ -142,14 +142,6 @@ else:
         for param in seq2seq.parameters():
             param.data.uniform_(-0.08, 0.08)
 
-        # Optimizer and learning rate scheduler can be customized by
-        # explicitly constructing the objects and pass to the trainer.
-        #
-        # optimizer = Optimizer(torch.optim.Adam(seq2seq.parameters()), max_grad_norm=5)
-        # scheduler = StepLR(optimizer.optimizer, 1)
-        # optimizer.set_scheduler(scheduler)
-
-    # train
     t = SupervisedTrainer(
         loss=loss,
         batch_size=32,
@@ -161,16 +153,19 @@ else:
     seq2seq = t.train(
         seq2seq,
         train,
-        num_epochs=6,
+        num_epochs=0,
         dev_data=dev,
         optimizer=optimizer,
         teacher_forcing_ratio=0.5,
         resume=opt.resume,
     )
 
-predictor = Predictor(seq2seq, input_vocab, output_vocab)
+predictor = Predictor(seq2seq, input_vocab, output_vocab, cache=True)
+cache = Cache(output_vocab)
+seq = []
 
 while True:
     seq_str = raw_input("Type in a source sequence:")
-    seq = seq_str.strip().split()
-    print(predictor.predict(seq))
+    elem = seq_str.strip()
+    seq.append(elem) # we should also remove elements after some threshold
+    print(predictor.predict(seq, cache))

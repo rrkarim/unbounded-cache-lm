@@ -4,75 +4,12 @@ from torch.autograd import Variable
 
 
 def _inflate(tensor, times, dim):
-    """
-        Given a tensor, 'inflates' it along the given dimension by replicating each slice specified number of times (in-place)
-
-        Args:
-            tensor: A :class:`Tensor` to inflate
-            times: number of repetitions
-            dim: axis for inflation (default=0)
-
-        Returns:
-            A :class:`Tensor`
-
-        Examples::
-            >> a = torch.LongTensor([[1, 2], [3, 4]])
-            >> a
-            1   2
-            3   4
-            [torch.LongTensor of size 2x2]
-            >> b = ._inflate(a, 2, dim=1)
-            >> b
-            1   2   1   2
-            3   4   3   4
-            [torch.LongTensor of size 2x4]
-            >> c = _inflate(a, 2, dim=0)
-            >> c
-            1   2
-            3   4
-            1   2
-            3   4
-            [torch.LongTensor of size 4x2]
-
-        """
     repeat_dims = [1] * tensor.dim()
     repeat_dims[dim] = times
     return tensor.repeat(*repeat_dims)
 
 
 class TopKDecoder(torch.nn.Module):
-    r"""
-    Top-K decoding with beam search.
-
-    Args:
-        decoder_rnn (DecoderRNN): An object of DecoderRNN used for decoding.
-        k (int): Size of the beam.
-
-    Inputs: inputs, encoder_hidden, encoder_outputs, function, teacher_forcing_ratio
-        - **inputs** (seq_len, batch, input_size): list of sequences, whose length is the batch size and within which
-          each sequence is a list of token IDs.  It is used for teacher forcing when provided. (default is `None`)
-        - **encoder_hidden** (num_layers * num_directions, batch_size, hidden_size): tensor containing the features
-          in the hidden state `h` of encoder. Used as the initial hidden state of the decoder.
-        - **encoder_outputs** (batch, seq_len, hidden_size): tensor with containing the outputs of the encoder.
-          Used for attention mechanism (default is `None`).
-        - **function** (torch.nn.Module): A function used to generate symbols from RNN hidden state
-          (default is `torch.nn.functional.log_softmax`).
-        - **teacher_forcing_ratio** (float): The probability that teacher forcing will be used. A random number is
-          drawn uniformly from 0-1 for every decoding token, and if the sample is smaller than the given value,
-          teacher forcing would be used (default is 0).
-
-    Outputs: decoder_outputs, decoder_hidden, ret_dict
-        - **decoder_outputs** (batch): batch-length list of tensors with size (max_length, hidden_size) containing the
-          outputs of the decoder.
-        - **decoder_hidden** (num_layers * num_directions, batch, hidden_size): tensor containing the last hidden
-          state of the decoder.
-        - **ret_dict**: dictionary containing additional information as follows {*length* : list of integers
-          representing lengths of output sequences, *topk_length*: list of integers representing lengths of beam search
-          sequences, *sequence* : list of sequences, where each sequence is a list of predicted token IDs,
-          *topk_sequence* : list of beam search sequences, each beam is a list of token IDs, *inputs* : target
-          outputs if provided for decoding}.
-    """
-
     def __init__(self, decoder_rnn, k):
         super(TopKDecoder, self).__init__()
         self.rnn = decoder_rnn
@@ -91,10 +28,6 @@ class TopKDecoder(torch.nn.Module):
         teacher_forcing_ratio=0,
         retain_output_probs=True,
     ):
-        """
-        Forward rnn for MAX_LENGTH steps.  Look at :func:`seq2seq.models.DecoderRNN.DecoderRNN.forward_rnn` for details.
-        """
-
         inputs, batch_size, max_length = self.rnn._validate_args(
             inputs, encoder_hidden, encoder_outputs, function, teacher_forcing_ratio
         )
@@ -215,33 +148,6 @@ class TopKDecoder(torch.nn.Module):
     def _backtrack(
         self, nw_output, nw_hidden, predecessors, symbols, scores, b, hidden_size
     ):
-        """Backtracks over batch to generate optimal k-sequences.
-
-        Args:
-            nw_output [(batch*k, vocab_size)] * sequence_length: A Tensor of outputs from network
-            nw_hidden [(num_layers, batch*k, hidden_size)] * sequence_length: A Tensor of hidden states from network
-            predecessors [(batch*k)] * sequence_length: A Tensor of predecessors
-            symbols [(batch*k)] * sequence_length: A Tensor of predicted tokens
-            scores [(batch*k)] * sequence_length: A Tensor containing sequence scores for every token t = [0, ... , seq_len - 1]
-            b: Size of the batch
-            hidden_size: Size of the hidden state
-
-        Returns:
-            output [(batch, k, vocab_size)] * sequence_length: A list of the output probabilities (p_n)
-            from the last layer of the RNN, for every n = [0, ... , seq_len - 1]
-
-            h_t [(batch, k, hidden_size)] * sequence_length: A list containing the output features (h_n)
-            from the last layer of the RNN, for every n = [0, ... , seq_len - 1]
-
-            h_n(batch, k, hidden_size): A Tensor containing the last hidden state for all top-k sequences.
-
-            score [batch, k]: A list containing the final scores for all top-k sequences
-
-            length [batch, k]: A list specifying the length of each sequence in the top-k candidates
-
-            p (batch, k, sequence_len): A Tensor containing predicted sequence
-        """
-
         lstm = isinstance(nw_hidden[0], tuple)
 
         # initialize return variables given different types
