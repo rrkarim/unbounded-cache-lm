@@ -8,7 +8,7 @@ Chainer v1.15.0.1
 `model.py` contains code for building model.  
 You can start training like following command:
 ```shell
-$ python model.py --batchsize=64 --gpu=0 --embed=128 --unit=256 --out=result -L=30 --mode=train
+$ python main.py --batchsize=64 --gpu=0 --embed=128 --unit=256 --out=result -L=30 --mode=train
 ```
 
 ## Reference
@@ -17,4 +17,4 @@ Edouard Grave, Moustapha Cisse, Armand Joulin
 
 ## TODO
 
-- [ ] IVFPQ (https://arxiv.org/abs/1702.08734)
+- [+] IVFPQ (https://arxiv.org/abs/1702.08734)
