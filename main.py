@@ -167,5 +167,5 @@ seq = []
 while True:
     seq_str = raw_input("Type in a source sequence:")
     elem = seq_str.strip()
-    seq.append(elem) # we should also remove elements after some threshold
+    seq.append(elem)  # we should also remove elements after some threshold
     print(predictor.predict(seq, cache))
