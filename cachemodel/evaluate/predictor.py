@@ -1,6 +1,6 @@
 import torch
 from torch.autograd import Variable
-from cachemodel.model import Cache
+from cachemodel.model import Cache, CacheKMeans
 
 
 class Predictor(object):
@@ -13,7 +13,7 @@ class Predictor(object):
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
         if cache == True:
-            self.cache = Cache(self.src_vocab, alpha)
+            self.cache = CacheKMeans(self.src_vocab, alpha)
         else:
             self.cache = None
 

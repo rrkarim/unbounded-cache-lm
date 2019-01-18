@@ -153,7 +153,7 @@ else:
         resume=opt.resume,
     )
 
-predictor = Predictor(seq2seq, input_vocab, output_vocab, cache=True)
+predictor = Predictor(seq2seq, input_vocab, output_vocab, cache=True, alpha=0.4)
 cache = Cache(output_vocab)
 seq = []
 
