@@ -5,10 +5,10 @@
 faiss
 
 ### Training
-`model.py` contains code for building model.  
-You can start training like following command:
-```shell
-$ python main.py
+```
+TRAIN_PATH=data/toy_reverse/train/data.txt
+DEV_PATH=data/toy_reverse/dev/data.txt
+$ python main.py --train_path $TRAIN_PATH --dev_path $DEV_PATH
 ```
 
 ## Reference
