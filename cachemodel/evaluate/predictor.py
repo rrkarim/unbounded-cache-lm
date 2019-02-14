@@ -21,6 +21,7 @@ class Predictor(object):
         src_id_seq = torch.LongTensor(
             [self.src_vocab.stoi[tok] for tok in src_seq]
         ).view(1, -1)
+
         if torch.cuda.is_available():
             src_id_seq = src_id_seq.cuda()
 

@@ -113,9 +113,9 @@ class DecoderRNN(BaseRNN):
                 ret_dict[DecoderRNN.KEY_ATTN_SCORE].append(step_attn)
             if cache is not None:
                 df = cache.calculate_sum(torch.squeeze(decoder_hidden))
-                average_p = cache.alpha * step_output + (
-                    1.0 - cache.alpha
-                ) * cache.calculate_sum(torch.squeeze(decoder_hidden))
+                with torch.no_grad():
+                    average_p = cache.alpha * step_output
+                    average_p += (1.0 - cache.alpha) * cache.calculate_sum(torch.squeeze(decoder_hidden))
                 average_p = F.log_softmax(average_p)
                 decoder_outputs.append(average_p)
             else:

@@ -153,8 +153,9 @@ else:
         resume=opt.resume,
     )
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 predictor = Predictor(seq2seq, input_vocab, output_vocab, cache=True, alpha=0.4)
-cache = Cache(output_vocab)
+cache = Cache(output_vocab, device=device)
 seq = []
 
 while True:
