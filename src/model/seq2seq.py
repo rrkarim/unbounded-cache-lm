@@ -20,6 +20,7 @@ class Seq2seq(nn.Module):
         target_variable=None,
         teacher_forcing_ratio=0,
     ):
+        print(input_variable)
         encoder_outputs, encoder_hidden = self.encoder(input_variable, input_lengths)
         result = self.decoder(
             inputs=target_variable,
